@@ -1,0 +1,72 @@
+name: Continuous Integration & Security Audit
+
+on:
+  push:
+    branches: [ "main", "master", "develop" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  tests-and-security:
+    name: Run Tests & Security Scan
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root_test_password
+          MYSQL_DATABASE: sales_dashboard_test
+          MYSQL_USER: salessync_test
+          MYSQL_PASSWORD: test_password_123
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP & Extensions
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_sqlite, pdo_mysql, bcmath
+          coverage: none
+
+      - name: Validate composer.json and composer.lock
+        run: composer validate --strict
+
+      - name: Get Composer Cache Directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache Composer Dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.json') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install Dependencies
+        run: composer install --prefer-dist --no-progress --no-suggest --no-interaction
+
+      - name: Security Vulnerability Scan (Composer Audit)
+        run: composer audit --no-interaction
+
+      - name: Setup Environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Run Database Migrations (SQLite)
+        run: |
+          touch database/database.sqlite
+          php artisan migrate --force
+
+      - name: Execute Feature & Unit Tests (PHPUnit)
+        run: php artisan test --colors=always
+        env:
+          DB_CONNECTION: sqlite
+          DB_DATABASE: database/database.sqlite
+          APP_ENV: testing
