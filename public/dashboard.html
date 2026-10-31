@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <meta name="csrf-token" content="demo-token-salessync-preview">
+    <title>SalesSync Dashboard — Real-Time Sales &amp; Revenue Analytics</title>
+
+    <!-- Google Fonts - Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Font Awesome 6 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+          integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA=="
+          crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+    <!-- Chart.js v4 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+    <!-- Dashboard CSS -->
+    <link rel="stylesheet" href="css/dashboard.css">
+
+    <!-- Auth Module & Guard -->
+    <script src="js/auth.js"></script>
+    <script>
+        // Enforce login — redirect to index.html (the default login page) if not authenticated
+        if (window.SalesSyncAuth && !window.SalesSyncAuth.requireAuth('index.html')) {
+            // Redirecting
+        }
+    </script>
+</head>
+<body>
+    <!-- Top Navbar -->
+    <nav class="navbar">
+        <div class="navbar-container">
+            <div class="navbar-brand">
+                <img src="images/logo.png" alt="SalesSync Logo" class="navbar-logo" style="width: 32px; height: 32px; border-radius: 8px; object-fit: contain;">
+                <span class="navbar-title">SalesSync</span>
+            </div>
+            <div class="navbar-right" style="display: flex; align-items: center; gap: 1rem;">
+                <div class="navbar-date">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span id="currentDate"></span>
+                </div>
+                <!-- User Profile & Logout -->
+                <div class="navbar-user" id="navbarUser" style="display: flex; align-items: center; gap: 0.65rem; padding-left: 0.75rem; border-left: 1px solid rgba(255,255,255,0.15);">
+                    <div class="user-avatar" style="width: 32px; height: 32px; border-radius: 50%; background: #4F46E5; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 0.85rem;">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="user-info" style="display: flex; flex-direction: column; line-height: 1.2;">
+                        <span id="navUserName" style="font-size: 0.82rem; font-weight: 600; color: #F8FAFC;">Admin User</span>
+                        <span id="navUserRole" style="font-size: 0.7rem; color: #94A3B8; text-transform: capitalize;">Administrator</span>
+                    </div>
+                    <button id="logoutBtn" class="btn btn-sm btn-outline" style="border-color: rgba(255,255,255,0.25); color: #F8FAFC; margin-left: 0.35rem; display: flex; align-items: center; gap: 0.35rem; padding: 0.35rem 0.75rem; font-size: 0.78rem;" title="Sign Out">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Sign Out</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="dashboard-container">
+
+            <!-- Row 1: Summary Cards -->
+            <div class="stats-grid">
+                <div class="stat-card stat-card--primary">
+                    <div class="stat-card__icon">
+                        <i class="fas fa-database"></i>
+                    </div>
+                    <div class="stat-card__content">
+                        <span class="stat-card__label">Total Records</span>
+                        <span class="stat-card__value" id="statTotalRecords" data-value="12">12</span>
+                    </div>
+                </div>
+
+                <div class="stat-card stat-card--success">
+                    <div class="stat-card__icon">
+                        <i class="fas fa-dollar-sign"></i>
+                    </div>
+                    <div class="stat-card__content">
+                        <span class="stat-card__label">Total Revenue</span>
+                        <span class="stat-card__value" id="statTotalValue" data-value="14250.75">$14,250.75</span>
+                    </div>
+                </div>
+
+                <div class="stat-card stat-card--warning">
+                    <div class="stat-card__icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <div class="stat-card__content">
+                        <span class="stat-card__label">Average Sale</span>
+                        <span class="stat-card__value" id="statAverageValue" data-value="1187.56">$1,187.56</span>
+                    </div>
+                </div>
+
+                <div class="stat-card stat-card--danger">
+                    <div class="stat-card__icon">
+                        <i class="fas fa-trophy"></i>
+                    </div>
+                    <div class="stat-card__content">
+                        <span class="stat-card__label">Top Category</span>
+                        <span class="stat-card__value stat-card__value--small" id="statTopCategory">
+                            Electronics
+                            <span class="stat-card__sub">$4,850.00</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Row 2: Chart + Form -->
+            <div class="content-grid">
+                <!-- LEFT: Chart Area (60%) -->
+                <div class="chart-section">
+                    <div class="card">
+                        <div class="card__header">
+                            <h2 class="card__title">
+                                <i class="fas fa-chart-bar"></i> Sales Overview
+                            </h2>
+                            <div class="chart-tabs" id="chartTabs">
+                                <button class="chart-tab active" data-type="bar">
+                                    <i class="fas fa-chart-bar"></i> Bar
+                                </button>
+                                <button class="chart-tab" data-type="line">
+                                    <i class="fas fa-chart-line"></i> Line
+                                </button>
+                                <button class="chart-tab" data-type="pie">
+                                    <i class="fas fa-chart-pie"></i> Pie
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card__body">
+                            <div class="chart-container">
+                                <!-- Loading Spinner -->
+                                <div id="chartLoading" class="chart-loading" style="display: none;">
+                                    <div class="spinner"></div>
+                                    <p>Loading chart data...</p>
+                                </div>
+
+                                <!-- Empty State -->
+                                <div id="chartEmpty" class="chart-empty" style="display: none;">
+                                    <i class="fas fa-chart-area"></i>
+                                    <h3>No data yet</h3>
+                                    <p>Add your first record to see beautiful charts!</p>
+                                </div>
+
+                                <!-- Chart Canvas -->
+                                <canvas id="mainChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RIGHT: Form Area (40%) -->
+                <div class="form-section">
+                    <div class="card">
+                        <div class="card__header">
+                            <h2 class="card__title">
+                                <i class="fas fa-plus-circle"></i> Add / Edit Record
+                            </h2>
+                            <p class="card__subtitle">Enter sales data to track performance</p>
+                        </div>
+                        <div class="card__body">
+                            <form id="recordForm" novalidate>
+                                <input type="hidden" id="recordId" name="record_id" value="">
+
+                                <!-- Category -->
+                                <div class="form-group">
+                                    <label for="category" class="form-label">
+                                        Category <span class="required">*</span>
+                                    </label>
+                                    <select id="category" name="category" class="form-control" required>
+                                        <option value="">Select a category...</option>
+                                        <option value="Electronics">Electronics</option>
+                                        <option value="Clothing">Clothing</option>
+                                        <option value="Food & Beverage">Food &amp; Beverage</option>
+                                        <option value="Home & Garden">Home &amp; Garden</option>
+                                        <option value="Sports">Sports</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                    <span class="form-error" id="categoryError"></span>
+                                </div>
+
+                                <!-- Custom Category (shown when "Other" is selected) -->
+                                <div class="form-group" id="customCategoryGroup" style="display: none;">
+                                    <label for="customCategory" class="form-label">
+                                        Custom Category <span class="required">*</span>
+                                    </label>
+                                    <input type="text" id="customCategory" name="custom_category" class="form-control"
+                                           placeholder="Enter custom category" maxlength="100">
+                                    <span class="form-error" id="customCategoryError"></span>
+                                </div>
+
+                                <!-- Amount -->
+                                <div class="form-group">
+                                    <label for="amount" class="form-label">
+                                        Amount ($) <span class="required">*</span>
+                                    </label>
+                                    <div class="input-icon-wrapper">
+                                        <span class="input-icon-prefix">$</span>
+                                        <input type="number" id="amount" name="value" class="form-control form-control--with-prefix"
+                                               step="0.01" min="0.01" placeholder="0.00" required>
+                                    </div>
+                                    <span class="form-error" id="amountError"></span>
+                                </div>
+
+                                <!-- Date -->
+                                <div class="form-group">
+                                    <label for="recordDate" class="form-label">
+                                        Date <span class="required">*</span>
+                                    </label>
+                                    <input type="date" id="recordDate" name="record_date" class="form-control" required>
+                                    <span class="form-error" id="dateError"></span>
+                                </div>
+
+                                <!-- Description -->
+                                <div class="form-group">
+                                    <label for="description" class="form-label">
+                                        Description <span class="optional">(optional)</span>
+                                    </label>
+                                    <textarea id="description" name="description" class="form-control" rows="3"
+                                              maxlength="1000" placeholder="Add a brief description of this sale..."></textarea>
+                                    <div class="form-help">
+                                        <span id="charCounter">0</span> / 1000 characters
+                                    </div>
+                                    <span class="form-error" id="descriptionError"></span>
+                                </div>
+
+                                <!-- Buttons Row -->
+                                <div class="form-actions">
+                                    <button type="button" id="btnAdd" class="btn btn-success">
+                                        <i class="fas fa-plus"></i> Add Record
+                                    </button>
+                                    <button type="button" id="btnUpdate" class="btn btn-warning" style="display: none;">
+                                        <i class="fas fa-save"></i> Update Record
+                                    </button>
+                                    <button type="button" id="btnCancel" class="btn btn-outline" style="display: none;">
+                                        <i class="fas fa-times"></i> Cancel Edit
+                                    </button>
+                                    <button type="button" id="btnReset" class="btn btn-outline">
+                                        <i class="fas fa-undo"></i> Reset
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Row 3: Records Table -->
+            <div class="table-section">
+                <div class="card">
+                    <div class="card__header">
+                        <h2 class="card__title">
+                            <i class="fas fa-table"></i> Sales Records
+                            <span class="badge" id="recordCountBadge">6</span>
+                        </h2>
+                    </div>
+
+                    <!-- Search / Filter Bar -->
+                    <div class="table-filters">
+                        <div class="filter-group">
+                            <div class="search-input-wrapper">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="searchInput" class="form-control" placeholder="Search records...">
+                            </div>
+                        </div>
+                        <div class="filter-group">
+                            <select id="filterCategory" class="form-control">
+                                <option value="">All Categories</option>
+                                <option value="Electronics">Electronics</option>
+                                <option value="Clothing">Clothing</option>
+                                <option value="Food & Beverage">Food &amp; Beverage</option>
+                                <option value="Home & Garden">Home &amp; Garden</option>
+                                <option value="Sports">Sports</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <input type="date" id="filterDateFrom" class="form-control" placeholder="From date">
+                        </div>
+                        <div class="filter-group">
+                            <input type="date" id="filterDateTo" class="form-control" placeholder="To date">
+                        </div>
+                    </div>
+
+                    <div class="card__body card__body--no-padding">
+                        <div class="table-responsive">
+                            <table class="data-table" id="recordsTable">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Category</th>
+                                        <th>Amount</th>
+                                        <th>Date</th>
+                                        <th>Description</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recordsTableBody">
+                                    <tr data-id="101" data-category="Electronics" data-value="1299.99" data-date="2026-10-24" data-description="MacBook Air M3 purchase for design team">
+                                        <td>1</td>
+                                        <td><span class="category-badge category-badge--electronics">Electronics</span></td>
+                                        <td class="amount-cell">$1,299.99</td>
+                                        <td>Oct 24, 2026</td>
+                                        <td class="description-cell">MacBook Air M3 purchase for design team</td>
+                                        <td class="actions-cell">
+                                            <button class="btn btn-sm btn-primary btn-edit" data-id="101" title="Edit"><i class="fas fa-edit"></i></button>
+                                            <button class="btn btn-sm btn-danger btn-delete" data-id="101" data-category="Electronics" title="Delete"><i class="fas fa-trash"></i></button>
+                                        </td>
+                                    </tr>
+                                    <tr data-id="102" data-category="Sports" data-value="549.50" data-date="2026-10-22" data-description="Pro Carbon Road Bike Helmet & Accessories">
+                                        <td>2</td>
+                                        <td><span class="category-badge category-badge--sports">Sports</span></td>
+                                        <td class="amount-cell">$549.50</td>
+                                        <td>Oct 22, 2026</td>
+                                        <td class="description-cell">Pro Carbon Road Bike Helmet & Accessories</td>
+                                        <td class="actions-cell">
+                                            <button class="btn btn-sm btn-primary btn-edit" data-id="102" title="Edit"><i class="fas fa-edit"></i></button>
+                                            <button class="btn btn-sm btn-danger btn-delete" data-id="102" data-category="Sports" title="Delete"><i class="fas fa-trash"></i></button>
+                                        </td>
+                                    </tr>
+                                    <tr data-id="103" data-category="Home & Garden" data-value="850.00" data-date="2026-10-18" data-description="Solid Teak Patio Dining Table">
+                                        <td>3</td>
+                                        <td><span class="category-badge category-badge--home-garden">Home &amp; Garden</span></td>
+                                        <td class="amount-cell">$850.00</td>
+                                        <td>Oct 18, 2026</td>
+                                        <td class="description-cell">Solid Teak Patio Dining Table</td>
+                                        <td class="actions-cell">
+                                            <button class="btn btn-sm btn-primary btn-edit" data-id="103" title="Edit"><i class="fas fa-edit"></i></button>
+                                            <button class="btn btn-sm btn-danger btn-delete" data-id="103" data-category="Home & Garden" title="Delete"><i class="fas fa-trash"></i></button>
+                                        </td>
+                                    </tr>
+                                    <tr data-id="104" data-category="Food & Beverage" data-value="320.25" data-date="2026-10-15" data-description="Quarterly Gourmet Coffee & Tea restock">
+                                        <td>4</td>
+                                        <td><span class="category-badge category-badge--food-beverage">Food &amp; Beverage</span></td>
+                                        <td class="amount-cell">$320.25</td>
+                                        <td>Oct 15, 2026</td>
+                                        <td class="description-cell">Quarterly Gourmet Coffee & Tea restock</td>
+                                        <td class="actions-cell">
+                                            <button class="btn btn-sm btn-primary btn-edit" data-id="104" title="Edit"><i class="fas fa-edit"></i></button>
+                                            <button class="btn btn-sm btn-danger btn-delete" data-id="104" data-category="Food & Beverage" title="Delete"><i class="fas fa-trash"></i></button>
+                                        </td>
+                                    </tr>
+                                    <tr data-id="105" data-category="Clothing" data-value="415.00" data-date="2026-10-12" data-description="Winter Waterproof Parka and Thermal Gloves">
+                                        <td>5</td>
+                                        <td><span class="category-badge category-badge--clothing">Clothing</span></td>
+                                        <td class="amount-cell">$415.00</td>
+                                        <td>Oct 12, 2026</td>
+                                        <td class="description-cell">Winter Waterproof Parka and Thermal Gloves</td>
+                                        <td class="actions-cell">
+                                            <button class="btn btn-sm btn-primary btn-edit" data-id="105" title="Edit"><i class="fas fa-edit"></i></button>
+                                            <button class="btn btn-sm btn-danger btn-delete" data-id="105" data-category="Clothing" title="Delete"><i class="fas fa-trash"></i></button>
+                                        </td>
+                                    </tr>
+                                    <tr data-id="106" data-category="Electronics" data-value="899.00" data-date="2026-10-08" data-description="Dell UltraSharp 32-inch 4K USB-C Monitor">
+                                        <td>6</td>
+                                        <td><span class="category-badge category-badge--electronics">Electronics</span></td>
+                                        <td class="amount-cell">$899.00</td>
+                                        <td>Oct 08, 2026</td>
+                                        <td class="description-cell">Dell UltraSharp 32-inch 4K USB-C Monitor</td>
+                                        <td class="actions-cell">
+                                            <button class="btn btn-sm btn-primary btn-edit" data-id="106" title="Edit"><i class="fas fa-edit"></i></button>
+                                            <button class="btn btn-sm btn-danger btn-delete" data-id="106" data-category="Electronics" title="Delete"><i class="fas fa-trash"></i></button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                                <tfoot>
+                                    <tr>
+                                        <td colspan="2"><strong>Total</strong></td>
+                                        <td class="amount-cell" id="tableTotal">
+                                            <strong>$4,333.74</strong>
+                                        </td>
+                                        <td colspan="3"></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3><i class="fas fa-exclamation-triangle"></i> Confirm Deletion</h3>
+                <button class="modal-close" id="modalClose">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the record for <strong id="modalCategory"></strong>?</p>
+                <p class="modal-warning">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="modalCancelBtn">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+                <button class="btn btn-danger" id="modalConfirmBtn">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/chart-handler.js"></script>
+    <script src="js/form-handler.js"></script>
+    <script src="js/dashboard.js"></script>
+
+    <script>
+        // Set current date in navbar
+        document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+
+        // Initialize user display & logout handler
+        if (window.SalesSyncAuth) {
+            const session = window.SalesSyncAuth.getSession();
+            if (session) {
+                const nameEl = document.getElementById('navUserName');
+                const roleEl = document.getElementById('navUserRole');
+                if (nameEl) nameEl.textContent = session.fullName || session.username;
+                if (roleEl) roleEl.textContent = session.role || 'User';
+            }
+
+            const logoutBtn = document.getElementById('logoutBtn');
+            if (logoutBtn) {
+                logoutBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    window.SalesSyncAuth.logout();
+                    window.location.href = 'index.html?logged_out=1';
+                });
+            }
+        }
+    </script>
+</body>
+</html>

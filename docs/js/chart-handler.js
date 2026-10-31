@@ -81,25 +81,30 @@ class ChartManager {
             if (response.ok) {
                 const data = await response.json();
                 this.updateChart(data);
+                this.hideLoading();
                 return;
             }
         } catch (error) {
             console.info('Backend API not reachable; compiling from initial table/local data.');
         }
 
-        // Fallback to table data or localStorage
+        // Fallback: load from localStorage first, then from hardcoded table
+        if (window.Dashboard && typeof window.Dashboard.loadFromLocalStorage === 'function') {
+            window.Dashboard.loadFromLocalStorage();
+        }
+
         if (window.Dashboard && typeof window.Dashboard.getRecordsFromTable === 'function') {
             const records = window.Dashboard.getRecordsFromTable();
             if (records.length > 0) {
                 const metrics = window.Dashboard.calculateMetrics(records);
                 this.updateChart(metrics);
+                this.hideLoading();
                 return;
             }
         }
 
-        this.checkEmpty(); finally {
-            this.hideLoading();
-        }
+        this.checkEmpty();
+        this.hideLoading();
     }
 
     /**
