@@ -32,6 +32,9 @@ class DashboardApp {
      * Initialize dashboard
      */
     init() {
+        // Load saved records from localStorage BEFORE chart init
+        this.loadFromLocalStorage();
+
         // Initialize child modules
         if (window.ChartManager && typeof window.ChartManager.init === 'function') {
             window.ChartManager.init();
@@ -44,6 +47,99 @@ class DashboardApp {
         this.bindTableEvents();
         this.bindFilters();
         this.bindModalEvents();
+    }
+
+    /**
+     * Load records from localStorage and rebuild the table.
+     * On first visit (no saved data), snapshot the hardcoded table rows into localStorage.
+     */
+    loadFromLocalStorage() {
+        try {
+            const saved = localStorage.getItem('salessync_records');
+
+            if (saved) {
+                // Restore saved records — replace hardcoded table rows
+                const records = JSON.parse(saved);
+                if (Array.isArray(records) && this.recordsTableBody) {
+                    // Clear existing hardcoded rows
+                    this.recordsTableBody.innerHTML = '';
+
+                    if (records.length === 0) {
+                        // Show empty state
+                        const emptyRow = document.createElement('tr');
+                        emptyRow.id = 'emptyRow';
+                        emptyRow.innerHTML = `
+                            <td colspan="6" class="empty-table" style="text-align: center; padding: 3rem 1rem; color: #94A3B8;">
+                                <i class="fas fa-inbox" style="font-size: 2rem; margin-bottom: 0.5rem; display: block;"></i>
+                                <p>No records found. Start adding sales data!</p>
+                            </td>
+                        `;
+                        this.recordsTableBody.appendChild(emptyRow);
+                    } else {
+                        // Rebuild rows from saved data
+                        records.forEach((record, index) => {
+                            const tr = document.createElement('tr');
+                            tr.setAttribute('data-id', record.id);
+                            tr.setAttribute('data-category', record.category);
+                            tr.setAttribute('data-value', record.value);
+                            tr.setAttribute('data-date', record.record_date);
+                            tr.setAttribute('data-description', record.description || '');
+
+                            let dateFormatted = record.record_date;
+                            try {
+                                const d = new Date(record.record_date);
+                                dateFormatted = d.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+                            } catch (e) {}
+
+                            const slugCategory = record.category.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+                            const descShort = record.description && record.description.length > 50
+                                ? record.description.substring(0, 50) + '...'
+                                : (record.description || '');
+
+                            tr.innerHTML = `
+                                <td>${index + 1}</td>
+                                <td>
+                                    <span class="category-badge category-badge--${slugCategory}">
+                                        ${this.escapeHtml(record.category)}
+                                    </span>
+                                </td>
+                                <td class="amount-cell">$${parseFloat(record.value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                <td>${dateFormatted}</td>
+                                <td class="description-cell">${this.escapeHtml(descShort)}</td>
+                                <td class="actions-cell">
+                                    <button class="btn btn-sm btn-primary btn-edit" data-id="${this.escapeHtml(String(record.id))}" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-danger btn-delete" data-id="${this.escapeHtml(String(record.id))}" data-category="${this.escapeHtml(record.category)}" title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            `;
+
+                            this.recordsTableBody.appendChild(tr);
+                        });
+                    }
+
+                    // Recalculate stats cards
+                    const allRecords = this.getRecordsFromTable();
+                    const metrics = this.calculateMetrics(allRecords);
+                    this.updateStatsCards(metrics.stats);
+                    this.updateTableFooters();
+
+                    if (this.recordCountBadge) {
+                        this.recordCountBadge.textContent = allRecords.length;
+                    }
+                }
+            } else {
+                // First visit: snapshot the hardcoded table rows into localStorage
+                const initialRecords = this.getRecordsFromTable();
+                if (initialRecords.length > 0) {
+                    localStorage.setItem('salessync_records', JSON.stringify(initialRecords));
+                }
+            }
+        } catch (e) {
+            console.warn('Failed to load records from localStorage:', e);
+        }
     }
 
     /**
